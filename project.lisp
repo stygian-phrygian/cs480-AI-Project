@@ -84,14 +84,17 @@
 ;; (vertexDegree (SC (GA NC)))
 ;; => 2
 ;;
+;; contributed by Josh
 (defun vertexDegree (v)
   (length (nth 1 v)))
 
 ;; vertexName: Vertex -> Symbol
+;; contributed by Josh
 (defun vertexName (v)
   (first v))
 
 ;; vertexNeighbors: Vertex -> List<VertexName>
+;; contributed by Josh
 (defun vertexNeighbors (v)
   (second v))
 
@@ -103,6 +106,7 @@
 ;; (vertexRemovefromNeighbors '(SC (GA NC)) 'GA)
 ;; => '(SC (NC))
 ;;
+;; contributed by Josh
 (defun vertexRemoveFromNeighbors (v vName)
   (list (vertexName v)
         (remove vName (vertexNeighbors v))))
@@ -118,12 +122,14 @@
 ;; (vertexHasDegreeZeroOrOne? (AK ()))
 ;; => t
 ;;
+;; contributed by Josh
 (defun vertexHasDegreeZeroOrOne? (v)
     (<= (vertexDegree v) 1))
 
 
 ;; Graph -> Boolean
 ;;
+;; contributed by Josh
 (defun graphNotEmpty? (g)
   (> (length g) 0))
 
@@ -131,6 +137,7 @@
 ;; return a new graph with the vertex removed
 ;; the neighbor references to the removed vertex will also be removed 
 ;;
+;; contributed by Josh
 (defun graphRemoveVertex (g v)
   (let ((g1 '())
         (vName (vertexName v)))
@@ -143,10 +150,22 @@
     ;; return the new graph
     g1))
 
+;; Graph, List<VertexName> -> Graph
+;; return a new graph with the vertices removed
+;; the neighbor references to the removed vertices will also be removed 
+;;
+;; contributed by Josh
+(defun graphRemoveVertices (g vNames)
+  (let ((g1 (copy-list g)))
+    (loop for vName in vNames do
+         (setf g1 (graphRemoveVertex g1 (graphGetVertex g vName))))
+    g1))
+
 ;; Graph -> Graph
 ;; return a new graph with all vertices removed where degree == 0 or 1
 ;; the neighbor references to removed vertices will also be removed 
 ;; 
+;; contributed by Josh
 (defun graphPrune (g)
   (let ((g1 (copy-list g))
         (verticesToRemove '()))
@@ -158,112 +177,184 @@
     (loop for v in g do
          (if (vertexHasDegreeZeroOrOne? v)
              (setf verticesToRemove (append verticesToRemove (list v)))))
+
     ;; remove vertices
     (loop for v in verticesToRemove do
          (setf g1 (graphRemoveVertex g1 v)))
-    g1))
+
+    ;; check that the pruning didn't result in vertices with degree 0 or 1
+    (let ((validPruning 't))
+      (loop for v in g1 when (vertexHasDegreeZeroOrOne? v) do
+           (progn (setf validPruning nil) (return)))
+
+      ;; if pruning didn't result in further 0 or 1 degree vertices
+      (if validPruning
+          ;; return the pruned graph
+          g1
+          ;; else prune further
+          (graphPrune g1)))))
 
 ;; Graph -> Vertex
-(defun graphGetMinimumVertex (g)
+;; contributed by Josh & Matt
+;; BUG fix by Matt
+(defun graphGetMaxDegreeVertex (g)
   (if (graphNotEmpty? g)
-      ;; iterate graph looking for the minimum vertex
-      (let* ((minimumVertex (first g))
-             (minimumVertexDegree (vertexDegree minimumVertex)))
-        ;; because w(v) == 1 for our particular problem, we don't need to calculate
-        ;; w(v)/d(v) and can just instead compare d(v)
-        ;;
-        ;; iterate graph
+      ;; assume first vertex is the max degree vertex
+      (let* ((maxVertex (first g))
+             (maxVertexDegree (vertexDegree maxVertex)))
+        ;; iterate graph (looking for a higher degree vertex)
         (loop for v in g do
-             (if (> (vertexDegree v) minimumVertexDegree)
-                 ;; update what are current minimum vertex/degree is
-                 (setf minimumVertex v)
-                 (setf minimumVertexDegree (vertexDegree v))))
-        minimumVertex)))
+             ;; if we found a higher degree vertex
+             (if (> (vertexDegree v) maxVertexDegree)
+                 ;; update what the current max vertex/degree is
+                 (progn
+                   (setf maxVertex v)
+                   (setf maxVertexDegree (vertexDegree v)))))
+        maxVertex)))
 
 ;; Graph -> CutSet
 ;; where
 ;;   CutSet:  List<Symbol> (Vertex Name)
+;; contributed by Josh
 (defun graphGetCutset (g)
   (let ((cutset '())
         (g1 (copy-list g)))
     (loop do
-         (format t "g1: ~A~%" g1) ;; debug
-         (format t "cutset: ~A~%" cutset) ;; debug
          ;; prune the graph of vertices with degree == 0 || 1
          (setf g1 (graphPrune g1))
-         (format t "pruned g1: ~A~%" g1) ;; debug
          ;; make sure the graph isn't empty (from the pruning)
          (if (not (null g1))
-             ;; get the minimum vertex of the graph
-             (let ((minimumVertex (graphGetMinimumVertex g1)))
-               (format t "minimum vertex: ~A~%" minimumVertex) ;; debug
-               ;; append the minimum vertex to the cutset
-               (setf cutset (append cutset (list (vertexName minimumVertex))))
-               ;; remove the minimum vertex from the graph
-               (setf g1 (graphRemoveVertex g1 minimumVertex))
-               (format t "g1:~A~%" g1) ;; debug
-
-               ))
+             ;; get the max degree vertex of the graph
+             (let ((maxVertex (graphGetMaxDegreeVertex g1)))
+               ;; append it to the cutset
+               (setf cutset (append cutset (list (vertexName maxVertex))))
+               ;; remove it from the graph
+               (setf g1 (graphRemoveVertex g1 maxVertex))))
          ;; while the graph isn't empty
          while (graphNotEmpty? g1))
     ;; return the cutset
     cutset))
 
 ;; Graph, VertexName -> Vertex
+;; contributed by Josh
 (defun graphGetVertex (g vName)
   (loop
      for v in g
      when (eq vName (vertexName v))
      return v))
 
-;; Graph, List<VertexName> -> List<Vertex>
-(defun graphConvertNamesToVertices (g vNames)
-  (loop for vName in vNames collect (graphGetVertex g vName)))
-
 ;; Graph -> VertexNames
+;; contributed by Josh
 (defun graphGetNames (g)
   (loop for v in g collect (vertexName v)))
 
-;; Graph, VertexName -> Graph
-(defun graphMakeFromNames (g vNames)
+;; Graph, List<VertexName> -> List<Vertex>
+;; contributed by Josh
+(defun graphConvertNamesToVertices (g vNames)
   (loop for vName in vNames collect (graphGetVertex g vName)))
 
 ;; Graph, Graph -> Graph
 ;; return the graph which is the difference of graphA - graphB
+;; contributed by Josh
 (defun graphDifference (graphA graphB)
   (let* ((aNames (graphGetNames graphA))
          (bNames (graphGetNames graphB))
          (cNames (set-difference aNames bNames))
-         (graphC (graphMakeFromNames graphA cNames)))
+         (graphC (graphConvertNamesToVertices graphA cNames)))
     graphC))
+
+;; Graph, VertexName -> List<VertexName>
+;; return a list of the vertices in the graph using a depth first search
+;; NB. this only works on connected graphs, 
+;;
+;; contributed by Josh
+(defun graphConnectedDFS (g startVName)
+  (let ((visited '()) ;; the visited vertices
+        (stack '()))  ;; the stack
+
+    ;; push the first element on the stack
+    (push startVName stack)
+    
+    ;; while the stack isn't empty
+    (loop
+       while (not (null stack))
+       do
+           ;; pop the stack
+         (let ((vName (pop stack)))
+           ;; visit the vertex (if it's not already visited)
+           (if (not (member vName visited))
+               (push vName visited))
+           ;; push the vertex's (unvisited) neighbors
+           (loop for vNeighborName in (vertexNeighbors (graphGetVertex g vName)) do
+                (if (not (member vNeighborName visited))
+                    (push vNeighborName stack)))))
+    ;; return the visited vertices
+    ;; (reverse it so the starting root vertex is at the first position)
+    (reverse visited)))
+
+;; Graph, VertexName ->  List<VertexName>
+;; return a list of the vertices in the graph using a depth first search
+;; NB. this works on *both* connected and disconnected graphs 
+;;
+;; contributed by Josh
+(defun graphDFS (g vStartName)
+  (let ((visited (graphConnectedDFS g vStartName))) ;; the visited vertices
+
+    (loop
+       ;; while we haven't visited every vertex in the graph
+       while (not (eq (length visited) (length g)))
+       ;; run DFS on the next unvisited vertex  
+       do
+         (let ((vNextStartName  (first (set-difference (graphGetNames g) visited))))
+           (setf visited (append visited (graphConnectedDFS g vNextStartName)))))
+    visited))
+
 
 ;; Graph -> ColorGraph
 ;; where
 ;;   ColorGraph:  List<ColorVertex>
 ;;   ColorVertex: List<VertexName, Neighbors, AvailableColors>
+;; contributed by Josh
 (defun graphToColorGraph (g)
     (loop for v in g collect 
           (list (vertexName v)
                 (vertexNeighbors v)
-                (copy-list *colors*))))
+                '()))) ;; initially unset color 
 
 ;; List<Whatever> -> Whatever
+;; contributed by Josh
 (defun nthRandom (lst)
-  (let* ((randomIndex   (random (length lst)))
-         (randomElement (nth randomIndex lst)))
-    randomElement))
+    (if (not (null lst))
+        (let* ((randomIndex   (random (length lst)))
+               (randomElement (nth randomIndex lst)))
+          randomElement)))
 
 ;; Color
+;; contributed by Josh
 (defun randomColor () (nthRandom *colors*))
 
+;; Number -> List<Color>
+;; contributed by Josh
+(defun randomNoRepeatColors (n)
+  (if (>= n 1)
+      (let ((lst (list (randomColor))))
+        (loop 
+           while (< (length lst) n)
+           do (let ((rc (randomColor)))
+                (if (not (eq (first lst) rc))
+                    (push rc lst))))
+        lst)))
+ 
 ;; ColorVertex -> List<Color>
+;; contributed by Josh
 (defun colorVertexGetColors (cv)
   (third cv))
 
 
 ;; ColorVertex, Color -> ColorVertex
-;; given a color vertex, return a new color vertex with "color"
-;; absent from its possible colors
+;; given a color vertex, return a new color vertex
+;; with "color" absent from its possible colors
+;; contributed by Josh
 (defun colorVertexRemoveColor (cv color)
   (list (vertexName cv)
         (vertexNeighbors cv)
@@ -271,6 +362,7 @@
 
 ;; ColorVertex, Color -> ColorVertex
 ;; given a color vertex, return a new color vertex with only one color set
+;; contributed by Josh
 (defun colorVertexSetColor (cv color)
   (list (vertexName cv)
         (vertexNeighbors cv)
@@ -278,6 +370,7 @@
 
 ;; ColorGraph, Name -> ColorVertex
 ;; get the associated colorGraphVertex at Name (else nil)
+;; contributed by Josh
 (defun colorGraphGetColorVertex (cg vName)
   (loop
      for v in cg
@@ -285,21 +378,14 @@
      return v))
 
 ;; ColorGraph, List<VertexName> -> List<ColorVertex>
+;; contributed by Josh
 (defun colorGraphConvertNamesToVertices (cg vNames)
   (loop for vName in vNames collect (colorGraphGetColorVertex cg vName)))
-
-;; ColorGraph -> ColorGraph
-;; make the colorgraph have one color option per vertex
-;;
-(defun colorGraphRender (cg)
-    (loop for v in cg collect
-          (list (vertexName v)
-                (vertexNeighbors v)
-                (list (first (third v)))))) ;; '(R G B) -> '(R)
 
 ;; ColorGraph -> Boolean
 ;; NB. this function assumes each vertex in the color graph is of length 1
 ;; (that is to say it's only 1 color)
+;; contributed by Josh
 (defun colorGraphIsValid? (cg)
   ;;
   ;; for each vertex in the color graph
@@ -313,7 +399,7 @@
                (vColor (first (colorVertexGetColors v))))
            ;; check color isn't nil
            (if (null vColor)
-               ;; break loop (returning false)
+               ;; break loop (returning false) if it is nil
                (progn
                  (setf validity nil)
                  (return)))
@@ -337,6 +423,7 @@
 ;; NB. this function assumes each subset vertex in the color graph
 ;; is of length 1 (that is to say it's only 1 color)
 ;; vertices in the color graph which *aren't* subset vertices are ignored
+;; contributed by Josh
 (defun colorGraphIsValidSubSet? (cg subsetNames)
   (let ((validity 't)) ;; assume true
     ;; for each subset vertex in the graph
@@ -360,57 +447,12 @@
                         (return)))))))
     validity))
 
-;; ColorGraph, VertexName, Color -> ColorGraph
-;; given a color graph
-;; assign a color to a specific vertex "vName"
-;; and return the newly updated color graph
-;
-;; WARNING: THIS DOES NO CONFLICT CHECKING
-;; that must be handled wherever this is called
-;;
-(defun colorGraphAssignColor (colorGraph vName color)
-  ;;
-  ;; assign the color to this color vertex by:
-  ;;   removing the color from the other neighbor vertices in the color graph
-  ;;   setting this color at the specific vertex in question
-  ;;
-  (let* ((cg '())
-         (colorVertex (colorGraphGetColorVertex colorGraph vName))
-         (colorVertexNeighbors (vertexNeighbors colorVertex)))
-
-    ;; iterate graph
-    (loop for cv in colorGraph do
-
-         (let ((currentVName (vertexName cv))
-               (vertexToAppend nil))
-
-           (cond
-             ;; if we're at our vertex
-             ((eq currentVName vName)
-              ;; set its color
-              (setf vertexToAppend (colorVertexSetColor cv color)))
-
-             ;; if we're at the vertex's neighbor
-             ((member currentVName colorVertexNeighbors)
-              ;; remove the color from the neighbor's possible colors
-              (setf vertexToAppend (colorVertexRemoveColor cv color)))
-
-             ;; else if we're not on the vertex or its neighbors
-             ;; do nothing
-             (t (setf vertexToAppend cv)))
-
-           ;; append the new vertex
-           (setf cg (append cg (list vertexToAppend)))))
-
-    ;; return the updated color graph
-    cg))
-
-  
 ;; ColorGraph, SubSet -> ColorGraph
 ;; where
 ;;   SubSet: List<VertexName>
 ;; WARNING: this might produce illegal color graphs
 ;; it must be checked elsewhere
+;; contributed by Josh
 (defun colorGraphRandomlyColorSubSet (colorGraph subsetNames)
   (let ((colorGraphWithValidSubSet nil))
     (loop for i below 1000 do
@@ -420,8 +462,7 @@
          ;; and randomly color them
          (loop for subsetName in subsetNames do
               ;; get a random color and assign it
-              (setf cg
-                    (colorGraphAssignColor cg subsetName (randomColor))))
+              (setf cg (colorGraphSetVertexColor cg subsetName (randomColor))))
          ;; check that the colored subset is valid
          (if (not (colorGraphIsValidSubSet? cg subsetNames))
              ;; if it's not valid, retry
@@ -439,87 +480,102 @@
     ;; or possibly nil if it didn't succeed
     colorGraphWithValidSubSet))
 
-;; ColorGraph -> ColorGraph
-;; higher degress... lower degrees
-(defun colorGraphSortByDegreeDescending (colorGraph)
-  (sort (copy-list colorGraph) #'> :key #'vertexDegree))
-    
-;; ColorGraph, RemainderVertices -> ColorGraph
-;; where
-;;  Remaindervertices: List<VertexName>
-;; assumes the complement of the remainder is colored already
+;; ColorGraph -> ()
+;; just pretty print it
+(defun printColorGraph (cg)
+  (format t "~A" (loop for cv in cg collect
+                      (format nil
+                              "  ~A, ~A, ~A~%"
+                              (vertexName cv)
+                              (vertexNeighbors cv)
+                              (colorVertexGetColors cv)))))
+  
+
+;; ColorGraph, VertexName, Color -> ColorGraph
+;; set vertex color without error checking
 ;;
-;; WARNING: may fail (produce a graph which isn't legal)
-;; and returns nil on failure
-
-;; (defun colorGraphColorRemainderVertices (colorGraph remainderVertexNames)
-;;   (let ((colorGraphValid nil)
-;;         (cg (copy-list colorGraph)))
-;;            ;; sort by degrees descending
-;;            (setf cg (colorGraphSortByDegreeDescending cg))
-;;            ;; iterate sorted color graph
-;;            (loop for v in cg do
-;;                 ;; skip vertex if not a member of remainder vertices
-;;                 (if (member (vertexName v) remainderVertexNames)
-;;                     (
-;;                     ;; get a possible color
-;;                     ;; if it can't be legally assigned, fail and return nil
-                    
-;;                     )
-                
-           
-;;            )
-;;     colorGraphValid))
-
-;;TODO
-;; Graph -> ColorGraph
-(defun doMapColoring (graph)
-  ;; convert the graph into a color graph (to hold color state)
-  (let ((cg (graphToColorGraph graph))
-        (cutset (graphGetCutset graph)))
-    ;; create random colors for the cutset
-    (setf cg (colorGraphRandomlyColorSubSet cg cutset))
-    ;; proceed if the returned cutset colored graph is valid
-    (if (not (null cg))
-        (let ((remainderVertexNames (set-difference
-                                     (graphGetNames graph)
-                                     cutset)))
-          ;; color the remainder vertices
-          (setf cg (colorGraphColorRemainderVertices cg remainderVertexNames))))
-    ;; return (valid) color graph (or nil)
+;; contributed by Josh
+(defun colorGraphSetVertexColor (colorGraph vName color)
+  (let ((cg '()))
+    ;; iterate the vertices
+    (loop for cv in colorGraph do
+         ;; if we found our vertex
+         (if (eq (vertexName cv) vName)
+             ;; append the updated vertex
+             (setf cg (append cg (list (colorVertexSetColor cv color))))
+             ;; else append the rest of the vertices
+             (setf cg (append cg (list cv)))))
     cg))
+             
 
-;; test graphGetCutset
-(format t "~%~%~%;--------------------------------~%")
-(format t "~A:~%=> ~S~%" "*map-1*"     (graphGetCutset *map-1*))
+;; ColorGraph, VertexName -> ColorGraph
+;; picks an available color for the specified vertex
+;; NB. this is for usage within code below and shouldn't be called otherwise
+;;
+;; contributed by Josh
+(defun colorGraphAssignAvailableColor (cg vName)
+  (let* ((v (colorGraphGetColorVertex cg vName))
+         (vNeighborNames (vertexNeighbors v))
+         (unavailableColors '())
+         (availableColors *colors*))
+    ;; get which colors are unavailable
+    (loop for vNeighborName in vNeighborNames do
+         (setf unavailableColors
+               (union unavailableColors
+                      (colorVertexGetColors (colorGraphGetColorVertex cg vNeighborName)))))
+    ;; get which colors are available
+    (setf availableColors (set-difference availableColors unavailableColors))
+    ;; set the color 
+    (colorGraphSetVertexColor cg vName (nthRandom availableColors))))
+    
+
+;; Graph -> ColorGraph
+;;
+;; Color a graph
+;; (the main program's algorithm)
+;;
+;;
+;; get cutset
+;; (randomly) color cutset
+;; remove cutset colors from cutset neighbors's available colors
+;; get a dfs tour of the remainder graph (the graph with cutset removed)
+;; for each vertex in order of the dfs tour
+;;   color the remainder graph with its remaining available colors
+;; return the colored graph
+;;
+;; contributed by Josh
+(defun doMapColoring (graph)
+  ;; get the cutset for this graph and
+  ;; get a dfs tour of the remainder graph (the graph with cutset removed)
+  (let* ((cutset (graphGetCutset graph))
+         (remainderGraph (graphRemoveVertices graph cutset))
+         (remainderTour (graphDFS remainderGraph (vertexName (first remainderGraph)))))
+    (loop
+       do
+         ;; convert graph to a color graph (and randomly color the cutset)
+         (let ((cg (colorGraphRandomlyColorSubSet (graphToColorGraph graph) cutset)))
+           ;; for each remainder vertex (in order) of the dfs tour
+           (loop for r in remainderTour do
+                ;; color the rest of the graph with each vertex's remaining available colors
+                (setf cg (colorGraphAssignAvailableColor cg r)))
+           ;; return a (valid) color graph
+           (if (colorGraphIsValid? cg)
+               (return cg))))))
+
+;; ;; test graphGetCutset
+;; (format t "~%~%~%;--------------------------------~%")
+;; (format t "~A:~%=> ~S~%" "*map-1*"     (graphGetCutset *map-1*))
 ;; (format t "~A:~%=> ~S~%" "*50-states*" (graphGetCutset *50-states*))
-(format t "--------------------------------;~%")
+;; (format t "--------------------------------;~%")
 
-;; ;; test colorGraphRandomlyColorSubSet 
-;; (format t "~%~%~%;--------------------------------~%")
-;; (format t
-;;         "~A~%=> ~S~%"
-;;         "randomly colored graph of *map-1*"
-;;         (colorGraphRandomlyColorSubSet (graphToColorGraph *map-1*) ;; color graph
-;;                                        (graphGetCutset *map-1*)))  ;; vertex names
-;; (format t "--------------------------------;~%")
-;; 
-;; ;; test graphDifference
-;; (format t "~%~%~%;--------------------------------~%")
-;; (format t
-;;         "~A~%=> ~S~%"
-;;         "graphDifference: *map-1* - the cutset of *map-1*"
-;;         (graphDifference *map-1* (graphMakeFromNames *map-1* (graphGetCutset *map-1*))))
-;; (format t "--------------------------------;~%")
-;; 
-;; ;; test doMapColoring
-;; (format t "~%~%~%;--------------------------------~%")
-;; (format t
-;;         "~A:~%=> ~S~%"
-;;         "*coloring map-1*"
-;;         (doMapColoring *map-1*))
-;; (format t
-;;         "~A:~%=> ~S~%"
-;;         "*coloring *50-states*"
-;;         (doMapColoring *50-states*))
-;; (format t "--------------------------------;~%")
+;; test doMapColoring
+(format t "~%~%~%;--------------------------------~%")
+(format t
+        "~A:~%=> ~S~%"
+        "*coloring map-1*"
+        (doMapColoring *map-1*))
+(format t
+        "~A:~%=> ~S~%"
+        "*coloring *50-states*"
+        (doMapColoring *50-states*))
+(format t "--------------------------------;~%")
