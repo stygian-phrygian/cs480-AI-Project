@@ -462,15 +462,14 @@
          ;; and randomly color them
          (loop for subsetName in subsetNames do
               ;; get a random color and assign it
-              (setf cg (colorGraphSetVertexColor cg subsetName (randomColor))))
+              (setf cg (colorGraphAssignAvailableColor cg subsetName)))
          ;; check that the colored subset is valid
          (if (not (colorGraphIsValidSubSet? cg subsetNames))
              ;; if it's not valid, retry
-             (format t ">> It's not valid (subset) coloring... retrying~%") ;; DEBUG
+             nil
              ;; else it's valid
              (progn
                ;; announce it's valid
-               (format t ">> Got a valid (subset) coloring!~%") ;; DEBUG
                ;; save the valid cutset color graph
                (setf colorGraphWithValidSubSet cg)
                ;; break out of our tries loop
@@ -483,13 +482,13 @@
 ;; ColorGraph -> ()
 ;; just pretty print it
 (defun printColorGraph (cg)
-  (format t "~A" (loop for cv in cg collect
-                      (format nil
-                              "  ~A, ~A, ~A~%"
-                              (vertexName cv)
-                              (vertexNeighbors cv)
-                              (colorVertexGetColors cv)))))
-  
+  (format t "~%~A~%" (loop for cv in cg collect
+                          (format nil
+                                  "  ~A, ~A, ~A~%"
+                                  (vertexName cv)
+                                  (vertexNeighbors cv)
+                                  (colorVertexGetColors cv)))))
+
 
 ;; ColorGraph, VertexName, Color -> ColorGraph
 ;; set vertex color without error checking
@@ -562,20 +561,11 @@
            (if (colorGraphIsValid? cg)
                (return cg))))))
 
-;; ;; test graphGetCutset
-;; (format t "~%~%~%;--------------------------------~%")
-;; (format t "~A:~%=> ~S~%" "*map-1*"     (graphGetCutset *map-1*))
-;; (format t "~A:~%=> ~S~%" "*50-states*" (graphGetCutset *50-states*))
-;; (format t "--------------------------------;~%")
-
 ;; test doMapColoring
-(format t "~%~%~%;--------------------------------~%")
-(format t
-        "~A:~%=> ~S~%"
-        "*coloring map-1*"
-        (doMapColoring *map-1*))
-(format t
-        "~A:~%=> ~S~%"
-        "*coloring *50-states*"
-        (doMapColoring *50-states*))
-(format t "--------------------------------;~%")
+(format t "~%----------------------------------------~%~%")
+(format t "Coloring *map-1*~%")
+(printColorGraph (doMapColoring *map-1*))
+(format t "~%----------------------------------------~%~%")
+(format t "Coloring *50-states*~%")
+(printColorGraph (doMapColoring *50-states*))
+(format t "~%----------------------------------------~%~%")
